@@ -1,6 +1,7 @@
 import abc
-from typing import Any, List
-from generic.objects.constraints import Constraint
+import copy
+from typing import Any, List, Union, Iterable
+from generic.objects.constraints import Constraint, ConstraintSet
 
 
 class Variable(abc.ABC):
@@ -18,7 +19,7 @@ class Variable(abc.ABC):
 
 	"""
 
-	def __init__(self, name: str, description: str, constraints: List[Constraint]) -> None:
+	def __init__(self, name: str, description: str, constraints: List[Constraint] = None) -> None:
 		"""
 		Generic Variable Constructor
 
@@ -32,7 +33,33 @@ class Variable(abc.ABC):
 
 		self.name = name
 		self.description = description
-		self.constraints = constraints
+		self._constraint_set = ConstraintSet(constraints=constraints)
+
+	def constrain(self, constraints: Union[Iterable, Constraint]) -> None:
+		"""
+		Constrain the variable with the additional constraint(s).
+
+		:param constraints: Union[Iterable, Constraint], The constraints to
+			apply to the variable.
+		:return: None
+
+		"""
+
+		constraints = [constraints] if isinstance(constraints, Constraint) else constraints
+		self._constraint_set.add_constraints(constraints=constraints)
+
+	def unconstrain(self, constraints: Union[Iterable, Constraint]) -> None:
+		"""
+		Remove the specified constraints from variable.
+
+		:param constraints: Union[Iterable, Constraint], The constraints to
+			remove from the variable and any binding.
+		:return: None
+
+		"""
+
+		constraints = [constraints] if isinstance(constraints, Constraint) else constraints
+		self._constraint_set.remove_constraints(constraints=constraints)
 
 	@property
 	def name(self) -> str:
@@ -85,14 +112,11 @@ class Variable(abc.ABC):
 		"""
 		Get the constraints for the variable.
 
-		Todo:
-			- Add methods for removing/adding constraints
-
 		:return: List[Constraint]
 
 		"""
 
-		return self._constraints
+		return self._constraint_set.constraints
 
 
 class Binding(object):
@@ -118,10 +142,23 @@ class Binding(object):
 		"""
 
 		self._value = None
-		self.variable = variable
-		self.rebind(value=value)
+		self._variable = variable
+		self.bind(value=value)
 
-	def rebind(self, value: Any) -> None:
+	def reassociate(self, variable: Variable) -> None:
+		"""
+		Associate the binding value with this variable.
+
+		:param variable: Variable, The variable to associate the
+			value with.
+		:return: None
+
+		"""
+
+		self._variable = variable
+		self.bind(value=self._value)
+
+	def bind(self, value: Any) -> None:
 		"""
 		Rebind with the new value.
 
@@ -132,4 +169,69 @@ class Binding(object):
 
 		"""
 
-		pass
+		for constraint in self._variable.constraints:
+			constraint.evaluate(value=value)
+
+		self._value = value
+
+	@property
+	def value(self) -> Any:
+		"""
+		Get the bound value.
+
+		:return: Any
+
+		"""
+
+		return copy.copy(self._value)
+
+	@property
+	def variable(self) -> Variable:
+		"""
+		Get the variable that the value is bound to.
+
+		:return: Variable
+
+		"""
+
+		return copy.copy(self._variable)
+
+
+class Solution(Variable):
+	"""
+	Solution Class
+
+	A solution is an unconstrained variable with a binding provided.
+
+	Attributes:
+		description (:obj:`str`): The description of the solution.
+
+	"""
+
+	def __init__(self, description: str) -> None:
+		"""
+		Solution Variable Constructor
+
+		:return: None
+
+		"""
+
+		super().__init__(
+			name=Solution.__name__,
+			description=description,
+			constraints=None
+		)
+
+	def constrain(self, constraints: Union[Iterable, Constraint]) -> None:
+		"""
+		Constrain the variable with the additional constraint(s).
+
+		:param constraints: Union[Iterable, Constraint], The constraints to
+			apply to the variable.
+		:return: None
+
+		:raises: NotImplementedError
+
+		"""
+
+		raise NotImplementedError()
