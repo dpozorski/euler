@@ -11,15 +11,19 @@ class Variable(abc.ABC):
 	A generic variable representing the domain of values that can be
 	input into a given problem.
 
+	TODO
+		- Name check for variable 'solution'
+
 	Attributes:
 		name (:obj:`str`): The name of the variable.
 		description (:obj:`str`): The description of the variable.
+		value (:obj:`Any`): The value to bind to the variable.
 		constraints (:obj:`List[Constraint]`): The list of constraints to
 			apply to any binding for this variable.
 
 	"""
 
-	def __init__(self, name: str, description: str, constraints: List[Constraint] = None) -> None:
+	def __init__(self, name: str, description: str, value: Any = None, constraints: List[Constraint] = None) -> None:
 		"""
 		Generic Variable Constructor
 
@@ -31,9 +35,11 @@ class Variable(abc.ABC):
 
 		"""
 
+		self._binding = None
 		self.name = name
 		self.description = description
 		self._constraint_set = ConstraintSet(constraints=constraints)
+		self.bind(value=value)
 
 	def constrain(self, constraints: Union[Iterable, Constraint]) -> None:
 		"""
@@ -47,6 +53,7 @@ class Variable(abc.ABC):
 
 		constraints = [constraints] if isinstance(constraints, Constraint) else constraints
 		self._constraint_set.add_constraints(constraints=constraints)
+		self.bind(value=self.binding)  # Recheck binding w/ new constraint
 
 	def unconstrain(self, constraints: Union[Iterable, Constraint]) -> None:
 		"""
@@ -60,6 +67,23 @@ class Variable(abc.ABC):
 
 		constraints = [constraints] if isinstance(constraints, Constraint) else constraints
 		self._constraint_set.remove_constraints(constraints=constraints)
+
+	def bind(self, value: Any) -> None:
+		"""
+		Rebind with the new value.
+
+		:param value: Any, The value to be bound to the var.
+		:return: None
+
+		:raises: ValueError
+
+		"""
+
+		if value is not None:
+			for constraint in self.constraints:
+				constraint.evaluate(value=value)
+
+			self._binding = value
 
 	@property
 	def name(self) -> str:
@@ -108,6 +132,28 @@ class Variable(abc.ABC):
 		self._description = description
 
 	@property
+	def binding(self) -> Any:
+		"""
+		Get the bound value.
+
+		:return: Any
+
+		"""
+
+		return copy.copy(self._binding)
+
+	@property
+	def value(self) -> Any:
+		"""
+		Get the bound value.
+
+		:return: Any
+
+		"""
+
+		return self.value
+
+	@property
 	def constraints(self) -> List[Constraint]:
 		"""
 		Get the constraints for the variable.
@@ -119,84 +165,6 @@ class Variable(abc.ABC):
 		return self._constraint_set.constraints
 
 
-class Binding(object):
-	"""
-	Variable Binding Class
-
-	A value binding to a variable.
-
-	Attributes:
-		variable (:obj:`Variable`): The variable to which the value is bound.
-		value (:obj:`Any`): The value bound to a given variable.
-
-	"""
-
-	def __init__(self, variable: Variable, value: Any) -> None:
-		"""
-		Variable Binding Constructor
-
-		:param variable: Variable, The variable to which the value is bound.
-		:param value: Any, The value bound to a given variable.
-		:return: None
-
-		"""
-
-		self._value = None
-		self._variable = variable
-		self.bind(value=value)
-
-	def reassociate(self, variable: Variable) -> None:
-		"""
-		Associate the binding value with this variable.
-
-		:param variable: Variable, The variable to associate the
-			value with.
-		:return: None
-
-		"""
-
-		self._variable = variable
-		self.bind(value=self._value)
-
-	def bind(self, value: Any) -> None:
-		"""
-		Rebind with the new value.
-
-		:param value: Any, The value to be bound to the var.
-		:return: None
-
-		:raises: ValueError
-
-		"""
-
-		for constraint in self._variable.constraints:
-			constraint.evaluate(value=value)
-
-		self._value = value
-
-	@property
-	def value(self) -> Any:
-		"""
-		Get the bound value.
-
-		:return: Any
-
-		"""
-
-		return copy.copy(self._value)
-
-	@property
-	def variable(self) -> Variable:
-		"""
-		Get the variable that the value is bound to.
-
-		:return: Variable
-
-		"""
-
-		return copy.copy(self._variable)
-
-
 class Solution(Variable):
 	"""
 	Solution Class
@@ -204,14 +172,17 @@ class Solution(Variable):
 	A solution is an unconstrained variable with a binding provided.
 
 	Attributes:
+		value (:obj:`Any`): The solution value.
 		description (:obj:`str`): The description of the solution.
 
 	"""
 
-	def __init__(self, description: str) -> None:
+	def __init__(self, value: Any, description: str) -> None:
 		"""
 		Solution Variable Constructor
 
+		:param value: Any, The solution value.
+		:param description: str, The description of the solution.
 		:return: None
 
 		"""
@@ -219,6 +190,7 @@ class Solution(Variable):
 		super().__init__(
 			name=Solution.__name__,
 			description=description,
+			value=value,
 			constraints=None
 		)
 
